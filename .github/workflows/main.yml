@@ -1,11 +1,10 @@
-name: Super Streak Bot (Manual Control)
+name: Ultimate Streak Bot (7-Day Cycle)
 
 on:
   schedule:
-    # Schedule wahi purana wala (Automatic)
+    # Schedule wahi hai: 12 PM, 8 PM, 10 PM, 12 AM (IST timings)
     - cron: '30 6,14,16,18 * * *'
   
-  # Yahan humne NAYA feature add kiya hai dropdown menu ka
   workflow_dispatch:
     inputs:
       force_mode:
@@ -15,14 +14,14 @@ on:
         type: choice
         options:
         - auto
-        - blast_30
+        - blast_today
         - cleanup
 
 permissions:
   contents: write
 
 jobs:
-  super-commit:
+  daily-cycle:
     runs-on: ubuntu-latest
     
     steps:
@@ -37,42 +36,62 @@ jobs:
           git config --global user.name "$USER_NAME"
           git config --global user.email "$USER_EMAIL"
 
-      - name: 🚀 Run Logic
+      - name: 🚀 Run 7-Day Logic
         env:
-          # Manual input ko read kar rahe hain
           MANUAL_MODE: ${{ inputs.force_mode }}
         run: |
+          # --- Time & Day Calculation ---
           current_hour=$(date -u +%H)
-          echo "Current UTC Hour: $current_hour"
-          echo "Selected Mode: $MANUAL_MODE"
+          day_of_week=$(date +%u) # 1=Monday, 7=Sunday
+          
+          # Default Commit Count set kar rahe hain din ke hisaab se
+          case $day_of_week in
+            1) count=32 ;; # Monday
+            2) count=28 ;; # Tuesday
+            3) count=37 ;; # Wednesday
+            4) count=26 ;; # Thursday
+            5) count=22 ;; # Friday
+            6) count=47 ;; # Saturday
+            7) count=34 ;; # Sunday
+            *) count=30 ;; # Backup (just in case)
+          esac
 
-          # Logic: Agar Time 14 (8PM) hai -OR- Tumne manually 'blast_30' select kiya
-          if [ "$current_hour" -eq "14" ] || [ "$MANUAL_MODE" == "blast_30" ]; then
+          echo "📅 Aaj Day-$day_of_week hai. Target Commits: $count"
+          echo "⏰ Current UTC Hour: $current_hour"
+
+          # --- LOGIC START ---
+
+          # CONDITION 1: 8 PM Blast (IST) ya Manual 'blast_today'
+          if [ "$current_hour" -eq "14" ] || [ "$MANUAL_MODE" == "blast_today" ]; then
             
-            echo "🔥 Blast Mode Activated: Generating 30 commits..."
-            for i in {1..30}
+            echo "🔥 8 PM Blast Mode ON. Aaj $count commits honge..."
+            for ((i=1; i<=count; i++))
             do
-              echo "Commit number $i at $(date)" >> activity_log.txt
+              echo "Log Entry $i | Day $day_of_week | $(date)" >> activity_log.txt
               git add activity_log.txt
-              git commit -m "chore(bot): rapid fire commit $i 🚀"
+              git commit -m "feat(daily-log): update entry $i for day $day_of_week 🚀"
             done
             
-          # Logic: Agar Time 16 (10PM) hai -OR- Tumne manually 'cleanup' select kiya
+          # CONDITION 2: 10 PM Cleanup (IST) ya Manual 'cleanup'
           elif [ "$current_hour" -eq "16" ] || [ "$MANUAL_MODE" == "cleanup" ]; then
             
-            echo "🧹 Cleanup Mode Activated..."
-            echo "Log reset at $(date)" > activity_log.txt
+            echo "🧹 10 PM Cleanup Mode ON. File reset ho rahi hai..."
+            # Yeh command file ko overwrite karke blank/fresh bana deti hai
+            echo "✅ Daily Log Reset: $(date)" > activity_log.txt
             git add activity_log.txt
-            git commit -m "chore(cleanup): cleaning up daily logs 🧹"
+            git commit -m "chore(maint): cleaning up daily logs for fresh start 🧹"
 
+          # CONDITION 3: Normal Routine (12 PM & 12 AM)
+          # Yeh 'else' block ensure karta hai ki agar upar wale time nahi hain,
+          # toh ye chalega hi chalega. Miss hone ka chance nahi.
           else
-            # Normal Routine
-            echo "✅ Normal Update Mode"
-            echo "Routine check: $(date)" >> activity_log.txt
+            
+            echo "🟢 Routine Check Mode (Fixed)"
+            echo "Routine verification: $(date)" >> activity_log.txt
             git add activity_log.txt
-            git commit -m "chore(bot): routine update 🟢"
+            git commit -m "chore(bot): routine health check ✅"
           fi
-
+          
       - name: 📤 Push Changes
         run: git push
         
